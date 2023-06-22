@@ -65,6 +65,14 @@
                 android:drawablePadding="4dp"
                 android:text="@string/next_button" />
         </LinearLayout>
+        <TextView
+            android:id="@+id/resultTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="16dp"
+            android:text="0"
+            android:textAppearance="?android:textAppearanceLarge" />
 
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

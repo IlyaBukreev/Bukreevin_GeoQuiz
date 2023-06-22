@@ -1,5 +1,6 @@
 package com.example.bukreevin_geoquiz
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
@@ -12,6 +13,8 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import com.bignerdranch.android.Bukeevin_GeoQuiz.Question
 import com.bignerdranch.android.Bukeevin_GeoQuiz.QuizViewModel
+import com.example.bukreevin_geoquiz.ResultActivity
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -23,21 +26,46 @@ class MainActivity : AppCompatActivity() {
     private lateinit var questionTextView: TextView
     private val TAG = "MainActivity"
 
-    private val questionBank = listOf(
-        Question(R.string.question_oceans, true),
-        Question(R.string.question_mideast, false),
-        Question(R.string.question_africa, false),
-        Question(R.string.question_americas, true),
-        Question(R.string.question_asia, true)
-    )
     private var currentIndex = 0
 
-    private lateinit var quizViewModel: QuizViewModel
+    private val questionBank = listOf(
+        Question(R.string.question_oceans, true, false, false),
+        Question(R.string.question_mideast, false, false, false),
+        Question(R.string.question_africa, false, false, false),
+        Question(R.string.question_americas, true, false, false),
+        Question(R.string.question_asia, true, false, false)
+    )
+
+    private val quizViewModel: QuizViewModel by lazy {
+        ViewModelProvider(this).get(QuizViewModel::class.java)
+    }
+
+    private fun updateQuestion() {
+        val questionTextResId = questionBank[currentIndex].textResId
+        questionTextView.setText(questionTextResId)
+        if (currentIndex == 0) {
+            prevButton.visibility = View.INVISIBLE
+        } else {
+            prevButton.visibility = View.VISIBLE
+        }
+        trueButton.isEnabled = true
+        falseButton.isEnabled = true
+        trueButton.visibility = View.VISIBLE
+        falseButton.visibility = View.VISIBLE
+
+    }
+
+    companion object {
+        private const val KEY_CURRENT_INDEX = "current_index"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate(Bundle?) called")
+
+        val correctAnswers = intent.getIntExtra("CORRECT_ANSWERS", 0)
+
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -55,11 +83,25 @@ class MainActivity : AppCompatActivity() {
         falseButton.setOnClickListener { view: View ->
             checkAnswer(false)
         }
+
         nextButton.setOnClickListener { view: View ->
-            currentIndex = (currentIndex + 1) % questionBank.size
-            val questionTextResId = questionBank[currentIndex].textResId
-            questionTextView.setText(questionTextResId)
+            quizViewModel.moveToNext()
+            currentIndex = quizViewModel.currentIndex
+            updateQuestion()
+
+            if (currentIndex == questionBank.size - 1) {
+                nextButton.isEnabled = false
+                nextButton.visibility = View.INVISIBLE
+
+                val correctAnswers = calculateCorrectAnswers()
+                val intent = Intent(this, ResultActivity::class.java)
+                intent.putExtra("CORRECT_ANSWERS", correctAnswers)
+                startActivity(intent)
+            }
+
+
         }
+
         prevButton.setOnClickListener { view: View ->
             if (currentIndex > 0) {
                 currentIndex = (currentIndex - 1) % questionBank.size
@@ -68,10 +110,32 @@ class MainActivity : AppCompatActivity() {
             }
             val questionTextResId = questionBank[currentIndex].textResId
             questionTextView.setText(questionTextResId)
+
+            prevButton.visibility = View.INVISIBLE
+
+            nextButton.isEnabled = true
+            nextButton.visibility = View.VISIBLE
         }
 
-        quizViewModel = ViewModelProvider(this).get(QuizViewModel::class.java)
-        Log.d(TAG, "Got a QuizViewModel: $quizViewModel")
+        quizViewModel.currentIndex = currentIndex
+
+        if (savedInstanceState != null) {
+            currentIndex = savedInstanceState.getInt(KEY_CURRENT_INDEX)
+            quizViewModel.currentIndex = currentIndex
+        }
+
+        updateQuestion()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_CURRENT_INDEX, currentIndex)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        currentIndex = savedInstanceState.getInt(KEY_CURRENT_INDEX)
+        quizViewModel.currentIndex = currentIndex
     }
 
     override fun onStart() {
@@ -100,12 +164,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAnswer(userAnswer: Boolean) {
-        val correctAnswer = questionBank[currentIndex].answer
+        val correctAnswer = quizViewModel.currentQuestionAnswer
+
+        trueButton.isEnabled = false
+        falseButton.isEnabled = false
+        trueButton.visibility = View.INVISIBLE
+        falseButton.visibility = View.INVISIBLE
+
         val messageResId = if (userAnswer == correctAnswer) {
             R.string.correct_toast
         } else {
             R.string.incorrect_toast
         }
         Toast.makeText(this, messageResId, Toast.LENGTH_SHORT).show()
+        if (currentIndex < questionBank.size - 1) {
+            nextButton.isEnabled = true
+            nextButton.visibility = View.VISIBLE
+        }
     }
+    private fun calculateCorrectAnswers(): Int {
+        var correctCount = 0
+        for (question in questionBank) {
+            if (question.userAnswer == question.correctAnswer) {
+                correctCount++
+            }
+        }
+        return correctCount
+    }
+
 }
